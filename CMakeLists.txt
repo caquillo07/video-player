@@ -4,6 +4,9 @@ set(CMAKE_CXX_STANDARD 14)
 
 add_subdirectory(lib/glfw)
 
+# silence deprecation warnings - should be removed in the future, but works for testing
+add_definitions(-DGL_SILENCE_DEPRECATION)
+
 if (APPLE)
     list(APPEND EXTRA_LIBS "-framework OpenGL")
 elseif(WIN32)
