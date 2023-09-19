@@ -1,7 +1,13 @@
 #include <GLFW/glfw3.h>
 #include <cstdio>
 
-int main() {
+bool loadFrame(const char* filename, int* width_out, int* height, unsigned char** data);
+
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        printf("usage: %s <video file>\n", argv[0]);
+        return 1;
+    }
     GLFWwindow *window;
     if (!glfwInit()) {
         printf("failed to init glfw\n");
@@ -15,28 +21,12 @@ int main() {
         return 1;
     }
 
-    auto *data = new unsigned char[100 * 100 * 3];
-    for (int y = 0; y < 100; y++) {
-        for (int x = 0; x < 100; x++) {
-            // RGB
-            // 0xff0000 -> red
-            // it's a flat buffer, so we have to calculate the offset
-            // 0xff0000 -> 0xff, 0x00, 0x00
-            data[y * 100 * 3 + x * 3 + 0] = 0xff;
-            data[y * 100 * 3 + x * 3 + 1] = 0x00;
-            data[y * 100 * 3 + x * 3 + 2] = 0x00;
-        }
-    }
-    for (int y = 25; y < 75; y++) {
-        for (int x = 25; x < 75; x++) {
-            // RGB
-            // 0xff0000 -> red
-            // it's a flat buffer, so we have to calculate the offset
-            // 0xff0000 -> 0xff, 0x00, 0x00
-            data[y * 100 * 3 + x * 3 + 0] = 0x00;
-            data[y * 100 * 3 + x * 3 + 1] = 0x00;
-            data[y * 100 * 3 + x * 3 + 2] = 0xff;
-        }
+    int frame_width, frame_height;
+    unsigned char* frame_data;
+    if (!loadFrame(argv[1], &frame_width, &frame_height, &frame_data)) {
+        printf("failed to load video frame data\n");
+        glfwTerminate();
+        return 1;
     }
 
     // make the window's context current. this HAS to be done before the texture
@@ -55,7 +45,7 @@ int main() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 100, 100, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame_width, frame_height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame_data);
 
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -66,7 +56,7 @@ int main() {
         glMatrixMode(GL_PROJECTION); // make it orthographic projection
         glLoadIdentity();
         // map the coordinates map the ones from the screen
-        glOrtho(0, window_width, 0, window_height, -1, 1); // left, right, bottom, top, near, far
+        glOrtho(0, window_width, window_height, 0, -1, 1); // left, right, bottom, top, near, far
         // how things are placed in the world, the coordinates
         glMatrixMode(GL_MODELVIEW);
 
@@ -75,9 +65,9 @@ int main() {
         glBindTexture(GL_TEXTURE_2D, texture_handle);
         glBegin(GL_QUADS);
             glTexCoord2d(0,0); glVertex2d(0,0);
-            glTexCoord2d(1,0); glVertex2d(100,0);
-            glTexCoord2d(1,1); glVertex2d(100,100);
-            glTexCoord2d(0,1); glVertex2d(0,100);
+            glTexCoord2d(1,0); glVertex2d(frame_width,0);
+            glTexCoord2d(1,1); glVertex2d(frame_width,frame_height);
+            glTexCoord2d(0,1); glVertex2d(0,frame_height);
         glEnd();
         glDisable(GL_TEXTURE_2D);
 
