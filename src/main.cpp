@@ -49,6 +49,7 @@ int main(int argc, char **argv) {
     const int frame_height = state.height;
     auto* frame_data = new uint8_t[frame_width * frame_height * 4]; // 4 bytes per pixel, RGBA
 
+    double first_frame_time;
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         int window_width, window_height;
@@ -64,10 +65,20 @@ int main(int argc, char **argv) {
 
         // read a new frame
 
-        if (!video_reader_read_frame(&state, frame_data)) {
+        int64_t pts;
+        if (!video_reader_read_frame(&state, frame_data, &pts)) {
             printf("failed to read video frame\n");
             glfwTerminate();
             return 1;
+        }
+        static bool first_frame = true;
+        if (first_frame) {
+            glfwSetTime(0.0);
+            first_frame = false;
+        }
+        double pt_in_seconds = pts * (double)state.time_base.num / (double)state.time_base.den;
+        while(pt_in_seconds > glfwGetTime()) {
+            glfwWaitEventsTimeout(pt_in_seconds - glfwGetTime());
         }
         glTexImage2D(
                 GL_TEXTURE_2D,

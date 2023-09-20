@@ -30,6 +30,7 @@ bool video_reader_open_file(VideoReaderState *state, const char *filename) {
             state->video_stream_index = i;
             state->width = av_codec_params->width;
             state->height = av_codec_params->height;
+            state->time_base = state->av_format_ctx->streams[i]->time_base;
             break;
         }
     }
@@ -66,7 +67,7 @@ bool video_reader_open_file(VideoReaderState *state, const char *filename) {
     return true;
 }
 
-bool video_reader_read_frame(VideoReaderState *state, uint8_t *frame_buffer) {
+bool video_reader_read_frame(VideoReaderState *state, uint8_t *frame_buffer, int64_t *pts_out) {
     // Decode one frame
     int response;
     while (av_read_frame(state->av_format_ctx, state->av_packet) >= 0) {
@@ -94,6 +95,7 @@ bool video_reader_read_frame(VideoReaderState *state, uint8_t *frame_buffer) {
         break;
     }
 
+    *pts_out = state->av_frame->pts;
 
     // Set up sws scaler
     if (!state->sws_scaler_ctx) {

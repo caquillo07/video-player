@@ -18,16 +18,18 @@ struct VideoReaderState {
     AVRational time_base;
 
     // Private internal state
-    AVFormatContext* av_format_ctx;
-    AVCodecContext* av_codec_ctx;
+    AVFormatContext *av_format_ctx;
+    AVCodecContext *av_codec_ctx;
     int video_stream_index;
-    AVFrame* av_frame;
-    AVPacket* av_packet;
-    SwsContext* sws_scaler_ctx;
+    AVFrame *av_frame;
+    AVPacket *av_packet;
+    SwsContext *sws_scaler_ctx;
 };
 
 bool video_reader_open_file(VideoReaderState *state, const char *filename);
-bool video_reader_read_frame(VideoReaderState *state, unsigned char *frame_buffer);
+
+bool video_reader_read_frame(VideoReaderState *state, unsigned char *frame_buffer, int64_t *pts);
+
 void video_reader_close(VideoReaderState *state);
 
 #endif //VIDEO_READER_H
