@@ -5,6 +5,7 @@
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libswscale/swscale.h>
 #include <inttypes.h>
 }
 
@@ -125,14 +126,45 @@ bool loadFrame(const char *filename, int *width_out, int *height_out, unsigned c
         av_packet_unref(packet);
     }
 
-    auto* data = new unsigned char [frame->width * frame->height * 3];
-    for (int x = 0; x < frame->width; x++) {
-        for (int y = 0; y < frame->height; y++) {
-            data[y * frame->width * 3 + x * 3 + 0] = frame->data[0][y * frame->linesize[0] + x];
-            data[y * frame->width * 3 + x * 3 + 1] = frame->data[0][y * frame->linesize[0] + x];
-            data[y * frame->width * 3 + x * 3 + 2] = frame->data[0][y * frame->linesize[0] + x];
-        }
+    // transform the frame from its YUV format to RGB
+    SwsContext *swsContext = sws_getContext(
+            frame->width,
+            frame->height,
+            codec_context->pix_fmt,
+            frame->width,
+            frame->height,
+            AV_PIX_FMT_RGB0, // RGBA
+            SWS_BILINEAR, // used when actually scaling
+            nullptr,
+            nullptr,
+            nullptr
+    );
+    if (!swsContext) {
+        printf("failed to create sws context\n");
+        av_packet_free(&packet);
+        av_frame_free(&frame);
+        avcodec_free_context(&codec_context);
+        avformat_close_input(&format_context);
+        avformat_free_context(format_context);
+        return false;
     }
+
+    // its a packed buffer, so we will have 4 bytes per pixel, all in a flat array
+    // this will mirror the data contained within the frame.
+    auto *data = new uint8_t[frame->width * frame->height * 4];
+    int destLineSize[4] = { frame->width * 4, 0, 0, 0 };
+    uint8_t *const dest[4] = { data, nullptr, nullptr, nullptr };
+    sws_scale(
+            swsContext,
+            frame->data,
+            frame->linesize,
+            0,
+            frame->height,
+            dest,
+            destLineSize
+    );
+    sws_freeContext(swsContext); // not needed after this.
+
     *width_out = frame->width;
     *height_out = frame->height;
     *data_out = data;
