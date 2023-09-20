@@ -1,30 +1,30 @@
 #include <GLFW/glfw3.h>
-#include <cstdio>
+#include <stdio.h>
+#include "video_reader.h"
 
-bool loadFrame(const char *filename, int *width_out, int *height, unsigned char **data);
 
 int main(int argc, char **argv) {
     if (argc < 2) {
         printf("usage: %s <video file>\n", argv[0]);
         return 1;
     }
+
+    VideoReaderState state{};
+    if (!video_reader_open_file(&state, argv[1])) {
+        printf("failed to open video file\n");
+        glfwTerminate();
+        return 1;
+    }
+
     GLFWwindow *window;
     if (!glfwInit()) {
         printf("failed to init glfw\n");
         return 1;
     }
 
-    window = glfwCreateWindow(640, 480, "Hello World", nullptr, nullptr);
+    window = glfwCreateWindow(state.width, state.height, "Hello World", nullptr, nullptr);
     if (!window) {
         printf("failed to create window\n");
-        glfwTerminate();
-        return 1;
-    }
-
-    int frame_width, frame_height;
-    unsigned char *frame_data;
-    if (!loadFrame(argv[1], &frame_width, &frame_height, &frame_data)) {
-        printf("failed to load video frame data\n");
         glfwTerminate();
         return 1;
     }
@@ -32,7 +32,6 @@ int main(int argc, char **argv) {
     // make the window's context current. this HAS to be done before the texture
     // is generated, otherwise it will not be added to the right context.
     glfwMakeContextCurrent(window);
-
     // load the above in a texture for caching in gpu
     GLuint texture_handle;
     glGenTextures(1, &texture_handle);
@@ -45,17 +44,10 @@ int main(int argc, char **argv) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-    glTexImage2D(
-            GL_TEXTURE_2D,
-            0,
-            GL_RGB,
-            frame_width,
-            frame_height,
-            0,
-            GL_RGBA,
-            GL_UNSIGNED_BYTE,
-            frame_data
-    );
+
+    const int frame_width = state.width;
+    const int frame_height = state.height;
+    auto* frame_data = new uint8_t[frame_width * frame_height * 4]; // 4 bytes per pixel, RGBA
 
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -69,6 +61,25 @@ int main(int argc, char **argv) {
         glOrtho(0, window_width, window_height, 0, -1, 1); // left, right, bottom, top, near, far
         // how things are placed in the world, the coordinates
         glMatrixMode(GL_MODELVIEW);
+
+        // read a new frame
+
+        if (!video_reader_read_frame(&state, frame_data)) {
+            printf("failed to read video frame\n");
+            glfwTerminate();
+            return 1;
+        }
+        glTexImage2D(
+                GL_TEXTURE_2D,
+                0,
+                GL_RGB,
+                frame_width,
+                frame_height,
+                0,
+                GL_RGBA,
+                GL_UNSIGNED_BYTE,
+                frame_data
+        );
 
         // now we render what we want
         glEnable(GL_TEXTURE_2D);
@@ -86,8 +97,9 @@ int main(int argc, char **argv) {
         glDisable(GL_TEXTURE_2D);
 
         glfwSwapBuffers(window);
-        glfwWaitEvents();
+        glfwPollEvents();
     }
+    video_reader_close(&state); // ?
 
     return 0;
 }
